@@ -1,0 +1,29 @@
+# Minimal requirements for Python 3.13 compatibility
+# Install these one by one to identify compatibility issues
+
+# Core dependencies - try these first
+opencv-python
+numpy
+pandas
+
+# Try MediaPipe - may not work with Python 3.13
+# mediapipe
+
+# Machine Learning - TensorFlow may also have issues with 3.13
+# tensorflow
+scikit-learn
+
+# UI and Visualization
+matplotlib
+seaborn
+
+# Data Processing
+Pillow
+
+# Utilities
+pyyaml
+tqdm
+colorama
+
+# Alternative hand tracking if MediaPipe doesn't work
+# cvzone

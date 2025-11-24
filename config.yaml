@@ -1,0 +1,89 @@
+# Configuration for Sign Language Translator
+
+# Camera Settings
+camera:
+  device_id: 0
+  width: 640
+  height: 480
+  fps: 30
+
+# MediaPipe Settings
+mediapipe:
+  max_num_hands: 2
+  min_detection_confidence: 0.7
+  min_tracking_confidence: 0.5
+  model_complexity: 1
+
+# Data Collection
+data_collection:
+  samples_per_gesture: 100
+  recording_duration: 3  # seconds
+  save_format: "json"
+  include_landmarks: true
+  include_images: false
+
+# Model Training
+training:
+  test_size: 0.2
+  validation_size: 0.1
+  batch_size: 32
+  epochs: 100
+  learning_rate: 0.001
+  early_stopping_patience: 10
+
+# Feature Extraction
+features:
+  normalize_landmarks: true
+  include_distances: true
+  include_angles: true
+  sequence_length: 30  # for dynamic gestures
+
+# Application Settings
+app:
+  confidence_threshold: 0.8
+  smoothing_window: 5
+  display_landmarks: true
+  show_confidence: true
+
+# Paths
+paths:
+  data_dir: "data"
+  models_dir: "data/models"
+  raw_data_dir: "data/raw"
+  processed_data_dir: "data/processed"
+
+# Gestures (ASL Alphabet for starters)
+gestures:
+  static:
+    - "A"
+    - "B" 
+    - "C"
+    - "D"
+    - "E"
+    - "F"
+    - "G"
+    - "H"
+    - "I"
+    - "J"
+    - "K"
+    - "L"
+    - "M"
+    - "N"
+    - "O"
+    - "P"
+    - "Q"
+    - "R"
+    - "S"
+    - "T"
+    - "U"
+    - "V"
+    - "W"
+    - "X"
+    - "Y"
+    - "Z"
+  
+  dynamic:
+    - "hello"
+    - "thank_you"
+    - "please"
+    - "sorry"
