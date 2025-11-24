@@ -4,6 +4,7 @@
 
 # Python Virtual Environments
 lessa/                   # Your specific virtual environment
+lessa/**                 # All files and subdirectories in lessa
 venv/
 env/
 ENV/
