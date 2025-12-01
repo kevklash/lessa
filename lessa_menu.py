@@ -29,10 +29,13 @@ def print_main_menu():
     print("3. 🔤 Alphabet Collection Tool")
     print("   └─ Systematic A-Z letter data collection")
     print()
-    print("4. 📊 System Information")
+    print("4. 🧠 Alphabet Recognizer")
+    print("   └─ Real-time letter recognition using collected data")
+    print()
+    print("5. 📊 System Information")
     print("   └─ Camera detection & system diagnostics")
     print()
-    print("5. 📚 Documentation")
+    print("6. 📚 Documentation")
     print("   └─ View guides and documentation")
     print()
     print("0. ❌ Exit")
@@ -82,6 +85,21 @@ def run_alphabet_collector():
         print("Make sure alphabet_collector.py exists in the project directory")
     except Exception as e:
         print(f"❌ Error running alphabet collector: {e}")
+
+def run_alphabet_recognizer():
+    """Run the alphabet recognizer."""
+    print("🧠 Starting Alphabet Recognizer...")
+    print("Loading trained model from collected data...")
+    
+    try:
+        # Import and run the alphabet recognizer
+        from alphabet_recognizer import run_alphabet_recognizer
+        run_alphabet_recognizer()
+    except ImportError as e:
+        print(f"❌ Error importing alphabet recognizer: {e}")
+        print("Make sure alphabet_recognizer.py exists in the project directory")
+    except Exception as e:
+        print(f"❌ Error running alphabet recognizer: {e}")
 
 def show_system_info():
     """Display system information and diagnostics."""
@@ -255,7 +273,7 @@ def show_usage_examples():
 def get_user_choice() -> Optional[str]:
     """Get user menu choice with error handling."""
     try:
-        return input("Select an option (0-5): ").strip()
+        return input("Select an option (0-6): ").strip()
     except (KeyboardInterrupt, EOFError):
         print("\n\n👋 Goodbye!")
         return '0'
@@ -279,11 +297,13 @@ def main():
         elif choice == '3':
             run_alphabet_collector()
         elif choice == '4':
-            show_system_info()
+            run_alphabet_recognizer()
         elif choice == '5':
+            show_system_info()
+        elif choice == '6':
             show_documentation()
         else:
-            print("❌ Invalid choice. Please select 0-5.")
+            print("❌ Invalid choice. Please select 0-6.")
         
         print("\n" + "=" * 70)
 
