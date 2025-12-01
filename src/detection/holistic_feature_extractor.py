@@ -264,6 +264,60 @@ class HolisticFeatureExtractor:
         
         return normalized.flatten()
     
+    def _calculate_body_proportions(self, pose_landmarks: np.ndarray) -> Dict[str, float]:
+        """Calculate body proportions for pose analysis."""
+        if len(pose_landmarks) == 0 or len(pose_landmarks) <= max(self.pose_landmarks.values()):
+            return {}
+        
+        proportions = {}
+        
+        try:
+            # Get key landmarks
+            left_shoulder = pose_landmarks[self.pose_landmarks['LEFT_SHOULDER']]
+            right_shoulder = pose_landmarks[self.pose_landmarks['RIGHT_SHOULDER']]
+            left_hip = pose_landmarks[self.pose_landmarks['LEFT_HIP']]
+            right_hip = pose_landmarks[self.pose_landmarks['RIGHT_HIP']]
+            left_elbow = pose_landmarks[self.pose_landmarks['LEFT_ELBOW']]
+            right_elbow = pose_landmarks[self.pose_landmarks['RIGHT_ELBOW']]
+            left_wrist = pose_landmarks[self.pose_landmarks['LEFT_WRIST']]
+            right_wrist = pose_landmarks[self.pose_landmarks['RIGHT_WRIST']]
+            nose = pose_landmarks[self.pose_landmarks['NOSE']]
+            
+            # Calculate basic distances
+            shoulder_width = np.linalg.norm(right_shoulder - left_shoulder)
+            hip_width = np.linalg.norm(right_hip - left_hip)
+            torso_height = np.linalg.norm((left_shoulder + right_shoulder) / 2 - (left_hip + right_hip) / 2)
+            
+            # Arm lengths
+            left_upper_arm = np.linalg.norm(left_shoulder - left_elbow)
+            right_upper_arm = np.linalg.norm(right_shoulder - right_elbow)
+            left_forearm = np.linalg.norm(left_elbow - left_wrist)
+            right_forearm = np.linalg.norm(right_elbow - right_wrist)
+            
+            # Head to body distance
+            head_to_shoulders = np.linalg.norm(nose - (left_shoulder + right_shoulder) / 2)
+            
+            # Store proportions
+            proportions.update({
+                'shoulder_width': shoulder_width,
+                'hip_width': hip_width,
+                'torso_height': torso_height,
+                'shoulder_hip_ratio': shoulder_width / (hip_width + 1e-8),
+                'left_upper_arm_length': left_upper_arm,
+                'right_upper_arm_length': right_upper_arm,
+                'left_forearm_length': left_forearm,
+                'right_forearm_length': right_forearm,
+                'arm_symmetry': abs(left_upper_arm - right_upper_arm) / (max(left_upper_arm, right_upper_arm) + 1e-8),
+                'head_to_shoulders_distance': head_to_shoulders,
+                'torso_aspect_ratio': torso_height / (shoulder_width + 1e-8)
+            })
+            
+        except (IndexError, KeyError) as e:
+            # If we can't calculate some proportions, return what we can
+            print(f"Warning: Could not calculate some body proportions: {e}")
+        
+        return proportions
+    
     def _calculate_torso_center(self, pose_landmarks: np.ndarray) -> np.ndarray:
         """Calculate the center point of the torso."""
         if len(pose_landmarks) <= max(self.pose_landmarks.values()):
@@ -508,3 +562,249 @@ class HolisticFeatureExtractor:
                 feature_vector.extend(rel_pos)
         
         return np.array(feature_vector)
+    
+    # Additional missing methods
+    
+    def _calculate_two_hand_relationships(self, left_hand: Dict[str, Any], 
+                                        right_hand: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate relationships between two hands."""
+        left_landmarks = np.array(left_hand['landmarks'])[:, :3]
+        right_landmarks = np.array(right_hand['landmarks'])[:, :3]
+        
+        # Distance between wrists
+        wrist_distance = np.linalg.norm(left_landmarks[0] - right_landmarks[0])
+        
+        # Hand symmetry analysis
+        symmetry_score = self._calculate_hand_symmetry_score(left_landmarks, right_landmarks)
+        
+        return {
+            'wrist_distance': wrist_distance,
+            'symmetry_score': symmetry_score,
+            'relative_orientation': self._calculate_relative_hand_orientation(left_landmarks, right_landmarks)
+        }
+    
+    def _calculate_hand_symmetry_score(self, left_landmarks: np.ndarray, 
+                                     right_landmarks: np.ndarray) -> float:
+        """Calculate symmetry score between two hands."""
+        if len(left_landmarks) < 21 or len(right_landmarks) < 21:
+            return 0.0
+        
+        # Mirror right hand and compare with left hand
+        mirrored_right = right_landmarks.copy()
+        mirrored_right[:, 0] *= -1  # Mirror x-coordinate
+        
+        # Calculate average distance between corresponding landmarks
+        distances = [np.linalg.norm(left_landmarks[i] - mirrored_right[i]) for i in range(21)]
+        return 1.0 / (1.0 + np.mean(distances))
+    
+    def _calculate_relative_hand_orientation(self, left_landmarks: np.ndarray,
+                                           right_landmarks: np.ndarray) -> Dict[str, float]:
+        """Calculate relative orientation between hands."""
+        left_orientation = self._calculate_hand_orientation(left_landmarks)
+        right_orientation = self._calculate_hand_orientation(right_landmarks)
+        
+        return {
+            'pitch_difference': abs(left_orientation.get('pitch', 0) - right_orientation.get('pitch', 0)),
+            'yaw_difference': abs(left_orientation.get('yaw', 0) - right_orientation.get('yaw', 0)),
+            'roll_difference': abs(left_orientation.get('roll', 0) - right_orientation.get('roll', 0))
+        }
+    
+    def _analyze_arm_positions(self, pose_landmarks: np.ndarray) -> Dict[str, Any]:
+        """Analyze arm positions and angles."""
+        if len(pose_landmarks) <= max(self.pose_landmarks.values()):
+            return {}
+        
+        try:
+            left_shoulder = pose_landmarks[self.pose_landmarks['LEFT_SHOULDER']]
+            right_shoulder = pose_landmarks[self.pose_landmarks['RIGHT_SHOULDER']]
+            left_elbow = pose_landmarks[self.pose_landmarks['LEFT_ELBOW']]
+            right_elbow = pose_landmarks[self.pose_landmarks['RIGHT_ELBOW']]
+            left_wrist = pose_landmarks[self.pose_landmarks['LEFT_WRIST']]
+            right_wrist = pose_landmarks[self.pose_landmarks['RIGHT_WRIST']]
+            
+            # Calculate arm angles
+            left_arm_angle = self._calculate_joint_angle(left_shoulder, left_elbow, left_wrist)
+            right_arm_angle = self._calculate_joint_angle(right_shoulder, right_elbow, right_wrist)
+            
+            return {
+                'left_arm_angle': left_arm_angle,
+                'right_arm_angle': right_arm_angle,
+                'arm_angle_difference': abs(left_arm_angle - right_arm_angle),
+                'left_elbow_height': left_elbow[1] - left_shoulder[1],
+                'right_elbow_height': right_elbow[1] - right_shoulder[1]
+            }
+        except (IndexError, KeyError):
+            return {}
+    
+    def _calculate_joint_angle(self, point1: np.ndarray, joint: np.ndarray, 
+                             point3: np.ndarray) -> float:
+        """Calculate angle at a joint between three points."""
+        v1 = point1 - joint
+        v2 = point3 - joint
+        
+        cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-8)
+        angle = np.arccos(np.clip(cos_angle, -1.0, 1.0))
+        return np.degrees(angle)
+    
+    def _calculate_shoulder_orientation(self, pose_landmarks: np.ndarray) -> Dict[str, float]:
+        """Calculate shoulder orientation."""
+        if len(pose_landmarks) <= max(self.pose_landmarks.values()):
+            return {}
+        
+        try:
+            left_shoulder = pose_landmarks[self.pose_landmarks['LEFT_SHOULDER']]
+            right_shoulder = pose_landmarks[self.pose_landmarks['RIGHT_SHOULDER']]
+            
+            shoulder_vector = right_shoulder - left_shoulder
+            
+            # Calculate shoulder tilt angle
+            tilt_angle = np.arctan2(shoulder_vector[1], shoulder_vector[0])
+            
+            return {
+                'shoulder_tilt_degrees': np.degrees(tilt_angle),
+                'shoulder_width': np.linalg.norm(shoulder_vector)
+            }
+        except (IndexError, KeyError):
+            return {}
+    
+    def _calculate_face_orientation(self, face_landmarks: np.ndarray) -> Dict[str, float]:
+        """Calculate face orientation from landmarks."""
+        if len(face_landmarks) < 10:
+            return {}
+        
+        # Use a subset of face landmarks to estimate orientation
+        # This is a simplified approach - in practice, you might want more sophisticated methods
+        face_center = self._calculate_face_center(face_landmarks)
+        
+        # Estimate nose tip (approximate)
+        nose_area = face_landmarks[:10]  # First few landmarks are usually around nose
+        nose_tip = np.mean(nose_area, axis=0)
+        
+        orientation_vector = nose_tip - face_center
+        
+        pitch = np.arctan2(orientation_vector[1], orientation_vector[2])
+        yaw = np.arctan2(orientation_vector[0], orientation_vector[2])
+        
+        return {
+            'face_pitch': np.degrees(pitch),
+            'face_yaw': np.degrees(yaw)
+        }
+    
+    def _analyze_mouth_region(self, face_landmarks: np.ndarray) -> Dict[str, Any]:
+        """Analyze mouth region features."""
+        if len(face_landmarks) < 20:
+            return {}
+        
+        # MediaPipe face landmarks for mouth are typically in a specific range
+        # This is a simplified approach - actual indices would depend on MediaPipe spec
+        mouth_landmarks = face_landmarks[10:20]  # Approximate mouth region
+        
+        mouth_center = np.mean(mouth_landmarks, axis=0)
+        mouth_width = np.max(mouth_landmarks[:, 0]) - np.min(mouth_landmarks[:, 0])
+        mouth_height = np.max(mouth_landmarks[:, 1]) - np.min(mouth_landmarks[:, 1])
+        
+        return {
+            'mouth_center': mouth_center.tolist(),
+            'mouth_width': mouth_width,
+            'mouth_height': mouth_height,
+            'mouth_aspect_ratio': mouth_width / (mouth_height + 1e-8)
+        }
+    
+    def _analyze_eye_region(self, face_landmarks: np.ndarray) -> Dict[str, Any]:
+        """Analyze eye region features."""
+        if len(face_landmarks) < 10:
+            return {}
+        
+        # Simplified eye region analysis
+        eye_landmarks = face_landmarks[0:10]  # Approximate eye region
+        
+        eye_center = np.mean(eye_landmarks, axis=0)
+        eye_span = np.max(eye_landmarks[:, 0]) - np.min(eye_landmarks[:, 0])
+        
+        return {
+            'eye_center': eye_center.tolist(),
+            'eye_span': eye_span
+        }
+    
+    def _calculate_facial_bounds(self, face_landmarks: np.ndarray) -> Dict[str, float]:
+        """Calculate bounding box of face landmarks."""
+        if len(face_landmarks) == 0:
+            return {}
+        
+        min_coords = np.min(face_landmarks, axis=0)
+        max_coords = np.max(face_landmarks, axis=0)
+        
+        return {
+            'face_width': max_coords[0] - min_coords[0],
+            'face_height': max_coords[1] - min_coords[1],
+            'face_depth': max_coords[2] - min_coords[2] if len(max_coords) > 2 else 0
+        }
+    
+    def _analyze_hands_to_face(self, hands_data: Dict[str, Any],
+                             ref_points: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        """Analyze hand positions relative to face."""
+        analysis = {}
+        
+        if 'face_center' not in ref_points:
+            return analysis
+        
+        face_center = ref_points['face_center']
+        
+        # Analyze each hand relative to face
+        for hand_side, hand_key in [('left', 'left_hand_center'), ('right', 'right_hand_center')]:
+            if hand_key in ref_points:
+                hand_pos = ref_points[hand_key]
+                distance_to_face = np.linalg.norm(hand_pos - face_center)
+                
+                analysis[f'{hand_side}_hand_to_face'] = {
+                    'distance': distance_to_face,
+                    'relative_position': (hand_pos - face_center).tolist()
+                }
+        
+        return analysis
+    
+    def _analyze_hand_symmetry(self, left_hand: Dict[str, Any], 
+                             right_hand: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze symmetry between hands."""
+        left_landmarks = np.array(left_hand['landmarks'])[:, :3]
+        right_landmarks = np.array(right_hand['landmarks'])[:, :3]
+        
+        symmetry_score = self._calculate_hand_symmetry_score(left_landmarks, right_landmarks)
+        
+        return {
+            'symmetry_score': symmetry_score,
+            'is_symmetric': symmetry_score > 0.7  # Threshold for symmetry
+        }
+    
+    def _analyze_overall_posture(self, ref_points: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        """Analyze overall body posture."""
+        posture_analysis = {}
+        
+        # Check if we have enough reference points
+        required_points = ['torso_center', 'nose']
+        if not all(point in ref_points for point in required_points):
+            return posture_analysis
+        
+        torso_center = ref_points['torso_center']
+        nose = ref_points['nose']
+        
+        # Calculate body alignment
+        body_vector = nose - torso_center
+        posture_analysis['body_alignment'] = {
+            'forward_lean': body_vector[2],  # Z-axis lean
+            'side_lean': abs(body_vector[0])  # X-axis lean
+        }
+        
+        # Add hand positions if available
+        hand_positions = []
+        for hand_key in ['left_hand_center', 'right_hand_center']:
+            if hand_key in ref_points:
+                hand_positions.append(ref_points[hand_key])
+        
+        if len(hand_positions) >= 2:
+            posture_analysis['hand_coordination'] = {
+                'hands_distance': np.linalg.norm(hand_positions[0] - hand_positions[1]),
+                'hands_height_difference': abs(hand_positions[0][1] - hand_positions[1][1])
+            }
+        
+        return posture_analysis
