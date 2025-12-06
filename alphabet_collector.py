@@ -131,10 +131,9 @@ class AlphabetCollector:
             current_count, target = self.get_letter_progress(current_letter)
             print(f"✅ Saved '{current_letter}' sample {current_count}/{target}")
             
-            # Auto-advance if letter is complete
+            # Show completion message but don't auto-advance
             if current_count >= target:
-                print(f"🎉 Letter '{current_letter}' complete! Moving to next incomplete letter.")
-                self.jump_to_next_incomplete()
+                print(f"🎉 Letter '{current_letter}' complete! Press 'N' to move to next letter when ready.")
             
             return True
             
