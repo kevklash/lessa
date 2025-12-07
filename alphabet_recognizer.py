@@ -18,6 +18,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from src.detection.holistic_detector import HolisticDetector
 from src.detection.holistic_feature_extractor import HolisticFeatureExtractor
 from src.utils.enhanced_camera import CameraManager
+from src.data.feature_cache import FeatureCache
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
@@ -37,6 +38,9 @@ class AlphabetRecognizer:
         self.label_encoder = {}
         self.trained_letters = []
         
+        # Feature caching for performance
+        self.feature_cache = FeatureCache()
+        
         # Recognition parameters
         self.confidence_threshold = 0.3  # Lower threshold for better detection
         self.recognition_history = []
@@ -50,66 +54,57 @@ class AlphabetRecognizer:
         self.load_training_data()
     
     def load_training_data(self) -> bool:
-        """Load and prepare training data from JSON file."""
+        """Load and prepare training data using feature cache for performance."""
+        load_start_time = time.time()
+        
         try:
             if not os.path.exists(self.data_file):
                 print(f"⚠️  No training data found at {self.data_file}")
                 print("   Please collect some alphabet samples first using the alphabet collector.")
                 return False
             
-            with open(self.data_file, 'r') as f:
-                data = json.load(f)
-            
-            # Extract features and labels
-            features = []
-            labels = []
-            
-            for letter, samples in data.items():
-                if len(samples) > 0:  # Only process letters with samples
-                    self.trained_letters.append(letter)
+            # Check if we can use cached features
+            if self.feature_cache.is_cache_valid(self.data_file):
+                print("🚀 Using cached features for fast loading...")
+                X, y, features_by_letter = self.feature_cache.load_cache()
+                
+                if X is not None and y is not None and len(X) > 0:
+                    # Update trained letters
+                    self.trained_letters = sorted(features_by_letter.keys())
                     
-                    for sample in samples:
-                        # Extract features from sample
-                        feature_vector = self._extract_features_from_sample(sample)
-                        if feature_vector is not None and len(feature_vector) > 0:
-                            features.append(feature_vector)
-                            labels.append(letter)
+                    # Store training features for similarity calculation
+                    self.training_features = X
+                    
+                    load_time = time.time() - load_start_time
+                    print(f"✅ Cached data loaded in {load_time:.3f}s (vs ~{load_time*10:.1f}s without cache)")
+                    print(f"   • Letters with data: {', '.join(self.trained_letters)}")
+                    print(f"   • Total samples: {len(X)}")
+                    print(f"   • Feature dimensions: {X.shape[1]}")
+                    
+                    # Train the model
+                    return self._train_model(X, y)
             
-            if len(features) == 0:
-                print("⚠️  No valid training features found in data file.")
+            # Cache is invalid or doesn't exist, rebuild it
+            print("🔄 Building feature cache (one-time process)...")
+            if not self.feature_cache.build_cache(self.data_file, self):
                 return False
             
-            # Check feature consistency
-            feature_lengths = [len(f) for f in features]
-            print(f"📊 Feature vector lengths: {set(feature_lengths)}")
+            # Load the newly built cache
+            X, y, features_by_letter = self.feature_cache.load_cache()
             
-            # Filter to only use features of the most common length
-            most_common_length = max(set(feature_lengths), key=feature_lengths.count)
-            print(f"📏 Using feature length: {most_common_length}")
-            
-            consistent_features = []
-            consistent_labels = []
-            
-            for i, (feature_vector, label) in enumerate(zip(features, labels)):
-                if len(feature_vector) == most_common_length:
-                    consistent_features.append(feature_vector)
-                    consistent_labels.append(label)
-                else:
-                    print(f"⚠️  Skipping sample {i} with length {len(feature_vector)}")
-            
-            if len(consistent_features) == 0:
-                print("⚠️  No consistent training features found.")
+            if X is None or y is None or len(X) == 0:
+                print("❌ No valid training features found.")
                 return False
             
-            # Convert to numpy arrays
-            X = np.array(consistent_features)
-            y = np.array(consistent_labels)
+            # Update trained letters
+            self.trained_letters = sorted(features_by_letter.keys())
             
             # Store training features for similarity calculation
             self.training_features = X
             
-            print(f"📊 Training data loaded:")
-            print(f"   • Letters with data: {sorted(self.trained_letters)}")
+            load_time = time.time() - load_start_time
+            print(f"📊 Training data processed in {load_time:.2f}s:")
+            print(f"   • Letters with data: {', '.join(self.trained_letters)}")
             print(f"   • Total samples: {len(X)}")
             print(f"   • Feature dimensions: {X.shape[1]}")
             
@@ -461,7 +456,8 @@ class AlphabetRecognizer:
             "Controls:",
             "L - Toggle landmarks",
             "I - Toggle info",
-            "R - Reload training data", 
+            "R - Reload training data",
+            "C - Clear feature cache", 
             "Q - Quit"
         ]
         
@@ -565,6 +561,10 @@ class AlphabetRecognizer:
                         print("✅ Training data reloaded successfully!")
                     else:
                         print("❌ Failed to reload training data")
+                elif key == ord('c'):
+                    print("🗑️  Clearing feature cache...")
+                    self.feature_cache.clear_cache()
+                    print("   Cache cleared. Next reload will rebuild cache.")
         
         except KeyboardInterrupt:
             print("\n👋 Recognition stopped by user")
