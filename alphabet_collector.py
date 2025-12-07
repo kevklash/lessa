@@ -69,6 +69,8 @@ class AlphabetCollector:
         """Get currently selected letter."""
         return self.alphabet[self.current_letter_index]
     
+
+    
     def get_letter_progress(self, letter: str) -> tuple:
         """Get progress for a specific letter."""
         collected = len(self.collected_data[letter])
@@ -140,6 +142,8 @@ class AlphabetCollector:
         except Exception as e:
             print(f"❌ Error saving sample: {e}")
             return False
+    
+
     
     def _serialize_detection_data(self, detection_data: dict) -> dict:
         """Serialize detection data for JSON storage."""
@@ -435,12 +439,14 @@ def run_alphabet_collector():
             # Display frame
             cv2.imshow('LESSA Alphabet Collector', interface_frame)
             
+
+            
             # Handle key presses
             key = cv2.waitKey(1) & 0xFF
             
             if key == ord('q'):
                 break
-            elif key == ord(' '):  # Space to save
+            elif key == ord(' '):  # Space to save/record
                 if holistic_detector.is_detection_complete(detection_data):
                     alphabet_collector.save_sample(detection_data, feature_extractor)
                 else:
